@@ -1,5 +1,5 @@
 """Pinned source build; no identity edits to the compiled kernel image."""
-import concurrent.futures, copy, gzip, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tarfile, urllib.request, zipfile
+import concurrent.futures, copy, difflib, gzip, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tarfile, urllib.request, zipfile
 ROOT=pathlib.Path(__file__).resolve().parent
 WORK=ROOT/'work';COMMON=WORK/'common';OUT=WORK/'out';ART=ROOT/'artifacts';CACHE=ROOT/'downloads'
 RELEASE='5.10.236-android12-9-00003-gfb24cf99ad97-ab14313284'
@@ -57,6 +57,78 @@ def protected_sources():
  return {str(p.relative_to(COMMON)):sha(p) for p in paths if p.exists()}
 def apply_patch(path):
  run(['patch','--batch','-p1','--fuzz=0','--input',path],cwd=COMMON)
+def apply_compatibility_patches():
+ # This stock commit has a different VMA-padding backport from the generic release.
+ # Adjust patch context only, retaining the stock implementation and every SUSFS addition.
+ source=WORK/'susfs/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch'
+ text=source.read_text()
+ old=' \tend = VMA_PAD_START(vma);';assert text.count(old)==1
+ text=text.replace(old,' \tend = vma->vm_end;')
+ old='@@ -906,6 +949,13 @@ static int show_smap(struct seq_file *m, void *v)\n \tstruct vm_area_struct *vma = v;'
+ new='@@ -906,7 +949,14 @@ static int show_smap(struct seq_file *m, void *v)\n \tstruct vm_area_struct *pad_vma = get_pad_vma(v);\n \tstruct vm_area_struct *vma = get_data_vma(v);'
+ assert text.count(old)==1;text=text.replace(old,new)
+ adapted=ART/'susfs-stock-context.patch';adapted.write_text(text);apply_patch(adapted)
+ # Port the same ShirkNeko map-hiding additions to this SUSFS/stock API combination.
+ # The upstream 69 patch targets an obsolete SUSFS function declaration and bool header helper.
+ target=COMMON/'fs/proc/task_mmu.c';before=target.read_text();text=before
+ marker='static void\nshow_map_vma(struct seq_file *m, struct vm_area_struct *vma)';assert text.count(marker)==1
+ helper='''static void show_vma_header_prefix_fake(struct seq_file *m,
+        unsigned long start, unsigned long end, vm_flags_t flags,
+        unsigned long long pgoff, dev_t dev, unsigned long ino)
+{
+    seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
+    seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+        start, end, flags & VM_READ ? 'r' : '-', flags & VM_WRITE ? 'w' : '-',
+        '-', flags & VM_MAYSHARE ? 's' : 'p', pgoff, MAJOR(dev), MINOR(dev), ino);
+}
+
+'''
+ text=text.replace(marker,helper+marker)
+ anchor='''#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+\t\tsusfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+''';assert text.count(anchor)==1
+ addition='''        if (file->f_path.dentry) {
+            const char *path = file->f_path.dentry->d_name.name;
+            if (strstr(path, "lineage")) {
+                start = vma->vm_start;
+                end = vma->vm_end;
+                show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+                name = "/system/framework/framework-res.apk";
+                goto done;
+            }
+            if (strstr(path, "jit-zygote-cache")) {
+                start = vma->vm_start;
+                end = vma->vm_end;
+                show_vma_header_prefix_fake(m, start, end, flags, pgoff, dev, ino);
+                goto bypass;
+            }
+        }
+'''
+ text=text.replace(anchor,anchor+addition)
+ marker='''\t/*
+\t * Print the dentry name for named mappings, and a
+''';assert text.count(marker)==1;text=text.replace(marker,'bypass:\n'+marker)
+ target.write_text(text)
+ diffs=list(difflib.unified_diff(before.splitlines(True),text.splitlines(True),fromfile='a/fs/proc/task_mmu.c',tofile='b/fs/proc/task_mmu.c'))
+ target=COMMON/'fs/proc/base.c';before=target.read_text();text=before
+ old='''\tif (vma && vma->vm_file) {
+\t\t*path = vma->vm_file->f_path;
+\t\tpath_get(path);
+\t\trc = 0;
+\t}'''
+ new='''\tif (vma && vma->vm_file) {
+        if (strstr(vma->vm_file->f_path.dentry->d_name.name, "lineage")) {
+            rc = kern_path("/system/framework/framework-res.apk", LOOKUP_FOLLOW, path);
+        } else {
+            *path = vma->vm_file->f_path;
+            path_get(path);
+            rc = 0;
+        }
+\t}'''
+ assert text.count(old)==1;text=text.replace(old,new);target.write_text(text)
+ diffs.extend(difflib.unified_diff(before.splitlines(True),text.splitlines(True),fromfile='a/fs/proc/base.c',tofile='b/fs/proc/base.c'))
+ (ART/'69-hide-stuff-stock-port.patch').write_text(''.join(diffs))
 def prepare():
  CACHE.mkdir(exist_ok=True);WORK.mkdir(exist_ok=True);ART.mkdir(exist_ok=True)
  with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:downloads=list(pool.map(download,SOURCES.items()))
@@ -73,8 +145,7 @@ def prepare():
  kc.write_text(text[:-len('endmenu\n')]+'source "drivers/kernelsu/Kconfig"\nendmenu\n')
  for src,dst in [(WORK/'susfs/kernel_patches/fs',COMMON/'fs'),(WORK/'susfs/kernel_patches/include/linux',COMMON/'include/linux')]:
   shutil.copytree(src,dst,dirs_exist_ok=True)
- apply_patch(WORK/'susfs/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch')
- apply_patch(WORK/'patches/69_hide_stuff.patch')
+ apply_compatibility_patches()
  task=COMMON/'fs/proc/task_mmu.c';text=task.read_text()
  if 'if (!vma_pages(vma))' not in text and 'goto show_pad;' in text:task.write_text(text.replace('goto show_pad;','return 0;'))
  after=protected_sources();assert before==after,'Scheduler / CPUfreq / idle / thermal / power source changed'
