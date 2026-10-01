@@ -27,7 +27,14 @@ def run(args,cwd=None,env=None):
 def download(item):
  name,(url,expected)=item;p=CACHE/name
  if not p.exists():
-  run(['curl','--fail','--location','--retry','3','--retry-all-errors','--output',str(p)+'.partial',url])
+  candidates=[url+'?build='+os.environ.get('GITHUB_RUN_ID','local')]
+  if name=='clang.tar.gz':candidates.append('https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz')
+  for candidate in candidates:
+   try:
+    run(['curl','--fail','--location','--retry','3','--retry-all-errors','--output',str(p)+'.partial',candidate])
+    break
+   except subprocess.CalledProcessError:
+    if candidate==candidates[-1]:raise
   pathlib.Path(str(p)+'.partial').replace(p)
  digest=sha(p)
  assert expected is None or digest==expected,(name,digest,expected)
