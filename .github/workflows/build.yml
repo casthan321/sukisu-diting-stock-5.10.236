@@ -13,12 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cache pinned downloads
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: downloads
           key: diting-fb24-clang416-ksub884-susfs3469-v1
       - name: Cache compiler objects
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
           key: diting-full-lto-${{ github.run_id }}
@@ -38,6 +38,12 @@ jobs:
           fi
       - name: Download pinned source and apply root patches
         run: python3 -u rebuild.py prepare
+      - name: Save pinned source cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: downloads
+          key: diting-fb24-clang416-ksub884-susfs3469-v1
       - name: Compile original FullLTO configuration
         run: |
           set -o pipefail
@@ -50,6 +56,12 @@ jobs:
           mkdir -p artifacts
           if [ -f work/out/.config ]; then cp work/out/.config artifacts/resolved.config; fi
           ccache --show-stats
+      - name: Save compiler cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: diting-full-lto-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

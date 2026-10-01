@@ -9,8 +9,8 @@ KSU='b88403d2561b6e00dff84a3c851e630c62f57fd0'
 SUSFS='3469d88bdb12da8948131cc7032f4f37730bd3de'
 PATCHES='547ae94bcaec53d030398f857950c64662043a5d'
 SOURCES={
- 'kernel.tar.gz':('https://android.googlesource.com/kernel/common/+archive/'+KERNEL+'.tar.gz','ed35e45b0db97b3d0004c757f0e9e3af627a09f093bbc044e7e4166979386c13'),
- 'clang.tar.gz':('https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz','e1956d42bd6ef73d25a36c6e597b963cd4fd739f117e54038cd6e84abd3fec45'),
+ 'kernel.tar.gz':('https://github.com/casthan321/sukisu-diting-stock-5.10.236/releases/download/source-cache-20261002/kernel-fb24cf99ad973cd4c7c7fa375c6053f939ef3a89.tar.gz','ed35e45b0db97b3d0004c757f0e9e3af627a09f093bbc044e7e4166979386c13'),
+ 'clang.tar.gz':('https://github.com/casthan321/sukisu-diting-stock-5.10.236/releases/download/source-cache-20261002/clang-r416183b-linux.tar.gz','e1956d42bd6ef73d25a36c6e597b963cd4fd739f117e54038cd6e84abd3fec45'),
  'sukisu.tar.gz':('https://codeload.github.com/SukiSU-Ultra/SukiSU-Ultra/tar.gz/'+KSU,'af02f1214cfbe14f8f2c0fe6daa5609aa40907fe525d3248f77bdd08c5487c1d'),
  'susfs.tar.gz':('https://codeload.github.com/ShirkNeko/susfs4ksu/tar.gz/'+SUSFS,None),
  'patches.tar.gz':('https://codeload.github.com/ShirkNeko/SukiSU_patch/tar.gz/'+PATCHES,None),
