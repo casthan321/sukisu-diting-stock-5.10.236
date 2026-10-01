@@ -1,0 +1,5 @@
+work/
+downloads/
+artifacts/
+build.log
+__pycache__/

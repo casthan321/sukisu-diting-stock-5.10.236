@@ -1,0 +1,61 @@
+name: Diting stock-source SukiSU 5.10.236
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: diting-stock-236
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache pinned downloads
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: diting-fb24-clang416-ksub884-susfs3469-v1
+      - name: Cache compiler objects
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: diting-full-lto-${{ github.run_id }}
+          restore-keys: diting-full-lto-
+      - name: Prepare build tools and memory
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache flex bison libssl-dev libelf-dev bc lz4 zip unzip
+          ccache --max-size=3G
+          free -h
+          df -h .
+          if ! swapon --show | grep -q /swapfile; then
+            sudo fallocate -l 10G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
+      - name: Download pinned source and apply root patches
+        run: python3 -u rebuild.py prepare
+      - name: Compile original FullLTO configuration
+        run: |
+          set -o pipefail
+          python3 -u rebuild.py build 2>&1 | tee build.log
+      - name: Verify all identity strings and package AK3
+        run: python3 -u rebuild.py package
+      - name: Capture diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts
+          if [ -f work/out/.config ]; then cp work/out/.config artifacts/resolved.config; fi
+          ccache --show-stats
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diting-stock-source-sukisu-5.10.236
+          path: |
+            artifacts/
+            build.log
+          retention-days: 14
+          compression-level: 1
