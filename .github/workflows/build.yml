@@ -16,7 +16,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: downloads
-          key: diting-fb24-clang416-ksub884-susfs3469-v1
+          key: diting-fb24-clang416-ksub884-susfs3469-${{ github.run_id }}
+          restore-keys: diting-fb24-clang416-ksub884-susfs3469-
       - name: Cache compiler objects
         uses: actions/cache/restore@v4
         with:
@@ -43,7 +44,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: downloads
-          key: diting-fb24-clang416-ksub884-susfs3469-v1
+          key: diting-fb24-clang416-ksub884-susfs3469-${{ github.run_id }}
       - name: Compile original FullLTO configuration
         run: |
           set -o pipefail

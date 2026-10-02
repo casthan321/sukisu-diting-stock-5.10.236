@@ -204,7 +204,7 @@ def environment():
  env=os.environ.copy();env.update(PATH=str(WORK/'clang/bin')+':'+env['PATH'],KBUILD_BUILD_USER='build-user',KBUILD_BUILD_HOST='build-host',KBUILD_BUILD_TIMESTAMP='Tue Oct 21 03:03:12 UTC 2025',KBUILD_BUILD_VERSION='1',CCACHE_BASEDIR=str(WORK),CCACHE_NOHASHDIR='true',CCACHE_COMPILERCHECK='content')
  return env
 def make_args():
- return ['make','-C',COMMON,'O='+str(OUT),'ARCH=arm64','LLVM=1','LLVM_IAS=1','CC=ccache clang','KCFLAGS=-D__ANDROID_COMMON_KERNEL__']
+ return ['make','-C',COMMON,'O='+str(OUT),'ARCH=arm64','CROSS_COMPILE=aarch64-linux-gnu-','CLANG_TRIPLE=aarch64-linux-gnu-','LLVM=1','LLVM_IAS=1','CC=ccache clang','KCFLAGS=-D__ANDROID_COMMON_KERNEL__']
 def check_config():
  original=config_dict((ROOT/'stock.config').read_text());actual=config_dict((OUT/'.config').read_text())
  differences={k:[original.get(k),actual.get(k)] for k in original.keys()|actual.keys() if original.get(k)!=actual.get(k)}
