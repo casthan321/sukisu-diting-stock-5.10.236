@@ -4,7 +4,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: diting-stock-236
+  group: diting-stock-236-memory-v2
   cancel-in-progress: false
 jobs:
   build:
