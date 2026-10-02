@@ -245,7 +245,7 @@ def package():
    elif entry.filename=='anykernel.sh':
     text=data.decode().replace('kernel.string=Wild Kernels by TheWildJames aka Morgan Weedman','kernel.string='+RELEASE+' / SukiSU source rebuild')
     text=text.replace('do.devicecheck=0','do.devicecheck=1').replace('device.name1=\n','device.name1=diting\n').replace('supported.versions=\n','supported.versions=15\n')
-    guard='rom_version=$(getprop ro.build.version.incremental)\n[ "$rom_version" = "OS3.0.3.0.VLFCNXM" ] || abort "Requires OS3.0.3.0.VLFCNXM; found $rom_version"\n'
+    guard='rom_version=$(file_getprop /system/build.prop ro.build.version.incremental)\n[ "$rom_version" ] || rom_version=$(file_getprop /system/system/build.prop ro.build.version.incremental)\n[ "$rom_version" ] || rom_version=$(getprop ro.build.version.incremental)\n[ "$rom_version" = "OS3.0.3.0.VLFCNXM" ] || abort "Requires OS3.0.3.0.VLFCNXM; found $rom_version"\n'
     data=text.replace('. tools/ak3-core.sh\n','. tools/ak3-core.sh\n'+guard).encode()
    dst.writestr(copy.copy(entry),data)
  with zipfile.ZipFile(output) as check:assert check.testzip() is None and check.read('Image')==final.read_bytes()
