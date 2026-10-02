@@ -1,5 +1,5 @@
 """Pinned source build; no identity edits to the compiled kernel image."""
-import concurrent.futures, copy, difflib, gzip, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tarfile, urllib.request, zipfile
+import concurrent.futures, copy, difflib, gzip, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tarfile, threading, urllib.request, zipfile
 ROOT=pathlib.Path(__file__).resolve().parent
 WORK=ROOT/'work';COMMON=WORK/'common';OUT=WORK/'out';ART=ROOT/'artifacts';CACHE=ROOT/'downloads'
 RELEASE='5.10.236-android12-9-00003-gfb24cf99ad97-ab14313284'
@@ -226,7 +226,14 @@ def objects():
  run(make_args()+['-j'+str(os.cpu_count()),'compile_objects_only'],env=env)
 def build():
  check_config();env=environment()
- run(make_args()+['-j'+str(os.cpu_count()),'Image'],env=env)
+ stop=threading.Event()
+ def monitor():
+  while not stop.wait(30):
+   print('FullLTO build still active; host memory status:',flush=True)
+   subprocess.run(['free','-m'],check=False)
+ threading.Thread(target=monitor,daemon=True).start()
+ try:run(make_args()+['-j'+str(os.cpu_count()),'Image'],env=env)
+ finally:stop.set()
 def verify(image):
  raw=image.read_bytes();assert raw[56:60]==b'ARMd'
  expected=json.loads((ROOT/'identity.json').read_text())['banner'].encode()
