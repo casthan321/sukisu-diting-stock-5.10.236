@@ -71,13 +71,24 @@ def apply_compatibility_patches():
  text=source.read_text()
  old=' \tend = VMA_PAD_START(vma);';assert text.count(old)==1
  text=text.replace(old,' \tend = vma->vm_end;')
- old='@@ -906,6 +949,13 @@ static int show_smap(struct seq_file *m, void *v)\n \tstruct vm_area_struct *vma = v;'
- new='@@ -906,7 +949,14 @@ static int show_smap(struct seq_file *m, void *v)\n \tstruct vm_area_struct *pad_vma = get_pad_vma(v);\n \tstruct vm_area_struct *vma = get_data_vma(v);'
- assert text.count(old)==1;text=text.replace(old,new)
+ start=text.index('@@ -906,6 +949,13 @@ static int show_smap(struct seq_file *m, void *v)')
+ end=text.index('@@ ',start+3)
+ text=text[:start]+text[end:]
  adapted=ART/'susfs-stock-context.patch';adapted.write_text(text);apply_patch(adapted)
  # Port the same ShirkNeko map-hiding additions to this SUSFS/stock API combination.
  # The upstream 69 patch targets an obsolete SUSFS function declaration and bool header helper.
  target=COMMON/'fs/proc/task_mmu.c';before=target.read_text();text=before
+ anchor='''\tstruct vm_area_struct *pad_vma = get_pad_vma(v);
+\tstruct vm_area_struct *vma = get_data_vma(v);
+\tstruct mem_size_stats mss;
+
+''';assert text.count(anchor)==1
+ text=text.replace(anchor,anchor+'''#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+    if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+        return 0;
+#endif
+
+''')
  marker='static void\nshow_map_vma(struct seq_file *m, struct vm_area_struct *vma)';assert text.count(marker)==1
  helper='''static void show_vma_header_prefix_fake(struct seq_file *m,
         unsigned long start, unsigned long end, vm_flags_t flags,
