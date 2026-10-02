@@ -168,6 +168,13 @@ def prepare():
  if 'if (!vma_pages(vma))' not in text and 'goto show_pad;' in text:task.write_text(text.replace('goto show_pad;','return 0;'))
  after=protected_sources();assert before==after,'Scheduler / CPUfreq / idle / thermal / power source changed'
  (ART/'protected-source-hashes.json').write_text(json.dumps(before,indent=2))
+ # Retain FullLTO but reduce host linker memory pressure; no kernel configuration change.
+ makefile=COMMON/'Makefile';text=makefile.read_text()
+ anchor='vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_OBJS) $(KBUILD_VMLINUX_LIBS)'
+ assert text.count(anchor)==1
+ text=text.replace(anchor,anchor+'\n\nPHONY += compile_objects_only\ncompile_objects_only: autoksyms_recursive $(vmlinux-deps)\n')
+ anchor='KBUILD_LDFLAGS\t+= -z noexecstack';assert text.count(anchor)==1
+ text=text.replace(anchor,anchor+'\nKBUILD_LDFLAGS += --threads=2');makefile.write_text(text)
  # Freeze root ABI metadata instead of querying current upstream versions on every make invocation.
  makefile=WORK/'KernelSU/kernel/Makefile';text=makefile.read_text()
  start=text.index('MDIR    :=');end=text.index('$(info -- $(REPO_NAME) version:')
@@ -214,8 +221,11 @@ def check_config():
  assert not unexpected,unexpected
  for k in ('CONFIG_KSU','CONFIG_KSU_SUSFS','CONFIG_KPM','CONFIG_LTO_CLANG_FULL','CONFIG_MODVERSIONS'):assert actual.get(k)=='y',(k,actual.get(k))
  shutil.copyfile(OUT/'.config',ART/'compiled.config')
-def build():
+def objects():
  env=environment();run(make_args()+['olddefconfig'],env=env);check_config()
+ run(make_args()+['-j'+str(os.cpu_count()),'compile_objects_only'],env=env)
+def build():
+ check_config();env=environment()
  run(make_args()+['-j'+str(os.cpu_count()),'Image'],env=env)
 def verify(image):
  raw=image.read_bytes();assert raw[56:60]==b'ARMd'

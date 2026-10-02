@@ -31,12 +31,11 @@ jobs:
           ccache --max-size=3G
           free -h
           df -h .
-          if ! swapon --show | grep -q /swapfile; then
-            sudo fallocate -l 10G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-          fi
+          sudo fallocate -l 24G /mnt/diting-build.swap
+          sudo chmod 600 /mnt/diting-build.swap
+          sudo mkswap /mnt/diting-build.swap
+          sudo swapon /mnt/diting-build.swap
+          swapon --show
       - name: Download pinned source and apply root patches
         run: python3 -u rebuild.py prepare
       - name: Save pinned source cache
@@ -45,7 +44,17 @@ jobs:
         with:
           path: downloads
           key: diting-fb24-clang416-ksub884-susfs3469-${{ github.run_id }}
-      - name: Compile original FullLTO configuration
+      - name: Compile original configuration objects
+        run: |
+          set -o pipefail
+          python3 -u rebuild.py objects 2>&1 | tee build-objects.log
+      - name: Checkpoint compiler cache before FullLTO link
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: diting-full-lto-objects-${{ github.run_id }}
+      - name: Link original FullLTO configuration
         run: |
           set -o pipefail
           python3 -u rebuild.py build 2>&1 | tee build.log
@@ -70,5 +79,6 @@ jobs:
           path: |
             artifacts/
             build.log
+            build-objects.log
           retention-days: 14
           compression-level: 1
